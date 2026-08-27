@@ -185,25 +185,6 @@ Processing time for service methods is logged automatically via the `@TrackProce
 
 ---
 
-## Running Tests
-
-```bash
-mvn test
-```
-
-24 tests across 4 test classes, all passing:
-
-| Test class | Tests | Scope |
-|---|---|---|
-| `NotificationEventServiceTest` | 9 | Service layer (unit) |
-| `DeliveryServiceTest` | 4 | Delivery idempotency + webhook |
-| `DeliveryRetryHandlerTest` | 4 | Retry + recover logic |
-| `NotificationEventControllerTest` | 9 | REST layer (MockMvc) |
-
-Tests use the `test` Spring profile, which disables the SQS consumer and uses an isolated H2 database.
-
----
-
 ## Contact
 
 delmoralcristian@gmail.com

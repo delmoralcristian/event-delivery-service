@@ -1,5 +1,6 @@
 package com.delmoralcristian.notifier.infrastructure.adapter.in.web.filter;
 
+import com.delmoralcristian.notifier.utils.MdcKeys;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Component;
 public class CorrelationIdFilter implements Filter {
 
     public static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
-    public static final String MDC_KEY = "correlationId";
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -32,13 +32,13 @@ public class CorrelationIdFilter implements Filter {
             correlationId = UUID.randomUUID().toString();
         }
 
-        MDC.put(MDC_KEY, correlationId);
+        MDC.put(MdcKeys.CORRELATION_ID, correlationId);
         httpResponse.setHeader(CORRELATION_ID_HEADER, correlationId);
 
         try {
             chain.doFilter(request, response);
         } finally {
-            MDC.remove(MDC_KEY);
+            MDC.remove(MdcKeys.CORRELATION_ID);
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.delmoralcristian.notifier.infrastructure.adapter.in.consumer;
 
 import com.delmoralcristian.notifier.application.service.DeliveryService;
+import com.delmoralcristian.notifier.utils.MdcKeys;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.awspring.cloud.sqs.annotation.SqsListener;
@@ -38,9 +39,9 @@ public class EventConsumer {
         EventDTO event = null;
         try {
             event = objectMapper.readValue(message, EVENT_TYPE_REFERENCE);
-            MDC.put("correlationId", UUID.randomUUID().toString());
-            MDC.put("eventId", event.getEventId());
-            MDC.put("clientId", event.getClientId());
+            MDC.put(MdcKeys.CORRELATION_ID, UUID.randomUUID().toString());
+            MDC.put(MdcKeys.EVENT_ID, event.getEventId());
+            MDC.put(MdcKeys.CLIENT_ID, event.getClientId());
 
             log.info("Processing event from SQS");
             this.deliveryService.send(event);
@@ -49,9 +50,9 @@ public class EventConsumer {
         } catch (Exception e) {
             log.error("Failed to process event — message will be retried by SQS. Raw: {}", message, e);
         } finally {
-            MDC.remove("correlationId");
-            MDC.remove("eventId");
-            MDC.remove("clientId");
+            MDC.remove(MdcKeys.CORRELATION_ID);
+            MDC.remove(MdcKeys.EVENT_ID);
+            MDC.remove(MdcKeys.CLIENT_ID);
         }
     }
 }

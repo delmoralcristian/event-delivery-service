@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import io.awspring.cloud.sqs.annotation.SqsListenerAcknowledgementMode;
 import io.awspring.cloud.sqs.listener.acknowledgement.Acknowledgement;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -37,6 +38,7 @@ public class EventConsumer {
         EventDTO event = null;
         try {
             event = objectMapper.readValue(message, EVENT_TYPE_REFERENCE);
+            MDC.put("correlationId", UUID.randomUUID().toString());
             MDC.put("eventId", event.getEventId());
             MDC.put("clientId", event.getClientId());
 
@@ -47,6 +49,7 @@ public class EventConsumer {
         } catch (Exception e) {
             log.error("Failed to process event — message will be retried by SQS. Raw: {}", message, e);
         } finally {
+            MDC.remove("correlationId");
             MDC.remove("eventId");
             MDC.remove("clientId");
         }

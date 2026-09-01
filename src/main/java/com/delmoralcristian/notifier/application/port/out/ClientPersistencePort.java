@@ -7,4 +7,7 @@ public interface ClientPersistencePort {
 
     Optional<ClientEntity> findById(String id);
 
+    boolean existsByIdAndApiKey(String clientId, String apiKey);
+
+    boolean existsByApiKey(String apiKey);
 }

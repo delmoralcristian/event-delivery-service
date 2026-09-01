@@ -6,7 +6,6 @@ import com.delmoralcristian.notifier.application.dto.NotificationEventDTO;
 import com.delmoralcristian.notifier.enums.EEventType;
 import com.delmoralcristian.notifier.enums.ENotificationStatus;
 import com.delmoralcristian.notifier.infrastructure.adapter.in.consumer.EventDTO;
-import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.ClientEntity;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.NotificationEventEntity;
 import java.time.LocalDateTime;
 import org.mapstruct.Mapper;
@@ -24,15 +23,15 @@ public interface NotificationEventMapper {
         );
     }
 
-    default NotificationEventEntity transformToNotificationEvent(ClientEntity client, EventDTO eventDTO) {
+    default NotificationEventEntity transformToNotificationEvent(String clientId, String webhookUrl, EventDTO eventDTO) {
         return NotificationEventEntity.builder()
             .eventId(eventDTO.getEventId())
             .eventType(eventDTO.getEventType())
             .content(eventDTO.getContent())
-            .client(client)
+            .clientId(clientId)
+            .webhookUrl(webhookUrl)
             .deliveryDate(LocalDateTime.now())
             .deliveryStatus(COMPLETED.name())
             .build();
     }
-
 }

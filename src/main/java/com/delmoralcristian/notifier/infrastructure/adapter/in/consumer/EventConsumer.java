@@ -1,6 +1,7 @@
 package com.delmoralcristian.notifier.infrastructure.adapter.in.consumer;
 
 import com.delmoralcristian.notifier.application.service.DeliveryService;
+import com.delmoralcristian.notifier.utils.LockService;
 import com.delmoralcristian.notifier.utils.MdcKeys;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,9 +25,11 @@ import org.springframework.stereotype.Component;
 public class EventConsumer {
 
     private static final TypeReference<EventDTO> EVENT_TYPE_REFERENCE = new TypeReference<>() {};
+    private static final String LOCK_TYPE = "EVENT";
 
     private final DeliveryService deliveryService;
     private final ObjectMapper objectMapper;
+    private final LockService lockService;
 
     @SqsListener(
         value = "${aws.sqs.consumer.event-notifications.queue-name}",
@@ -36,23 +39,31 @@ public class EventConsumer {
         acknowledgementMode = SqsListenerAcknowledgementMode.MANUAL
     )
     public void processMessage(@Payload String message, @Headers MessageHeaders headers, Acknowledgement ack) {
-        EventDTO event = null;
         try {
-            event = objectMapper.readValue(message, EVENT_TYPE_REFERENCE);
+            final var event = objectMapper.readValue(message, EVENT_TYPE_REFERENCE);
             MDC.put(MdcKeys.CORRELATION_ID, UUID.randomUUID().toString());
             MDC.put(MdcKeys.EVENT_ID, event.getEventId());
             MDC.put(MdcKeys.CLIENT_ID, event.getClientId());
 
-            log.info("Processing event from SQS");
-            this.deliveryService.send(event);
-            ack.acknowledge();
-            log.info("Event processed and acknowledged");
+            try {
+                log.info("Processing event from SQS");
+
+                var lockId = event.getEventId() + ":" + event.getClientId();
+                var processed = lockService.executeWithLock(LOCK_TYPE, lockId, () -> deliveryService.send(event));
+
+                if (processed) {
+                    ack.acknowledge();
+                    log.info("Event processed and acknowledged");
+                } else {
+                    log.warn("Could not acquire lock for event {} — will be retried by SQS", event.getEventId());
+                }
+            } finally {
+                MDC.remove(MdcKeys.CORRELATION_ID);
+                MDC.remove(MdcKeys.EVENT_ID);
+                MDC.remove(MdcKeys.CLIENT_ID);
+            }
         } catch (Exception e) {
             log.error("Failed to process event — message will be retried by SQS. Raw: {}", message, e);
-        } finally {
-            MDC.remove(MdcKeys.CORRELATION_ID);
-            MDC.remove(MdcKeys.EVENT_ID);
-            MDC.remove(MdcKeys.CLIENT_ID);
         }
     }
 }

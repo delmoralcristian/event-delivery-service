@@ -28,8 +28,7 @@ public class DeliveryRetryHandler {
         backoff = @Backoff(delayExpression = "#{@retryProperties.backoffDelay}")
     )
     public void attemptDelivery(NotificationEventEntity event) {
-        var client = event.getClient();
-        var webhookUrl = client.getWebhookUrl();
+        var webhookUrl = event.getWebhookUrl();
 
         if (StringUtils.isEmpty(webhookUrl)) {
             throw new WebhookDeliveryException("Invalid webhook URL for event " + event.getEventId());

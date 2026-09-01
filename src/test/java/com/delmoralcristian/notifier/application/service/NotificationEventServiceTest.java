@@ -14,10 +14,10 @@ import com.delmoralcristian.notifier.application.port.out.ClientPersistencePort;
 import com.delmoralcristian.notifier.application.port.out.NotificationEventPersistencePort;
 import com.delmoralcristian.notifier.enums.EEventType;
 import com.delmoralcristian.notifier.enums.ENotificationStatus;
+import com.delmoralcristian.notifier.exceptions.EntityNotFoundException;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.mapper.NotificationEventMapper;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.ClientEntity;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.NotificationEventEntity;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -51,7 +51,7 @@ class NotificationEventServiceTest {
 
     @Test
     void findByFilters_returnsEvents() {
-        var entity = buildEntity(EVENT_ID, "COMPLETED");
+        var entity = buildEntity(EVENT_ID, CLIENT_ID, "COMPLETED");
         var dto = buildDto(EVENT_ID, ENotificationStatus.COMPLETED);
         when(clientAdapter.findById(CLIENT_ID)).thenReturn(Optional.of(buildClient()));
         when(notificationAdapter.findByFilters(eq(CLIENT_ID), eq("COMPLETED"), eq(FROM), eq(TO), any(Pageable.class)))
@@ -96,12 +96,12 @@ class NotificationEventServiceTest {
 
     @Test
     void getByEventId_returnsDto() {
-        var entity = buildEntity(EVENT_ID, "COMPLETED");
+        var entity = buildEntity(EVENT_ID, CLIENT_ID, "COMPLETED");
         var dto = buildDto(EVENT_ID, ENotificationStatus.COMPLETED);
         when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
         when(notificationEventMapper.transformToDto(entity)).thenReturn(dto);
 
-        var result = service.getByEventId(EVENT_ID);
+        var result = service.getByEventId(EVENT_ID, CLIENT_ID);
 
         assertThat(result.eventId()).isEqualTo(EVENT_ID);
     }
@@ -110,52 +110,59 @@ class NotificationEventServiceTest {
     void getByEventId_notFound_throwsEntityNotFoundException() {
         when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getByEventId(EVENT_ID))
+        assertThatThrownBy(() -> service.getByEventId(EVENT_ID, CLIENT_ID))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining(EVENT_ID);
+    }
+
+    @Test
+    void getByEventId_wrongClient_throwsEntityNotFoundException() {
+        var entity = buildEntity(EVENT_ID, "OTHER_CLIENT", "COMPLETED");
+        when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> service.getByEventId(EVENT_ID, CLIENT_ID))
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining(EVENT_ID);
     }
 
     @Test
     void replayNotification_delegatesToDeliveryService() {
-        var entity = buildEntity(EVENT_ID, "FAILED");
+        var entity = buildEntity(EVENT_ID, CLIENT_ID, "FAILED");
         when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
 
-        service.replayNotification(EVENT_ID);
+        service.replayNotification(EVENT_ID, CLIENT_ID);
 
-        verify(deliveryService).reSend(entity);
+        verify(deliveryService).reSend(EVENT_ID);
     }
 
     @Test
     void replayNotification_notFound_throwsEntityNotFoundException() {
         when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.replayNotification(EVENT_ID))
+        assertThatThrownBy(() -> service.replayNotification(EVENT_ID, CLIENT_ID))
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining(EVENT_ID);
     }
 
     @Test
-    void replayNotification_alreadyCompleted_throwsIllegalArgument() {
-        var entity = buildEntity(EVENT_ID, "COMPLETED");
+    void replayNotification_wrongClient_throwsEntityNotFoundException() {
+        var entity = buildEntity(EVENT_ID, "OTHER_CLIENT", "FAILED");
         when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
 
-        assertThatThrownBy(() -> service.replayNotification(EVENT_ID))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("already COMPLETED");
+        assertThatThrownBy(() -> service.replayNotification(EVENT_ID, CLIENT_ID))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining(EVENT_ID);
     }
 
-    private NotificationEventEntity buildEntity(String eventId, String status) {
-        var client = ClientEntity.builder()
-            .id(CLIENT_ID)
-            .webhookUrl("https://webhook.example.com")
-            .build();
+    private NotificationEventEntity buildEntity(String eventId, String clientId, String status) {
         return NotificationEventEntity.builder()
             .eventId(eventId)
             .eventType("CREDIT_CARD_PAYMENT")
             .content("Payment content")
             .deliveryDate(LocalDateTime.now())
             .deliveryStatus(status)
-            .client(client)
+            .clientId(clientId)
+            .webhookUrl("https://webhook.example.com")
             .build();
     }
 

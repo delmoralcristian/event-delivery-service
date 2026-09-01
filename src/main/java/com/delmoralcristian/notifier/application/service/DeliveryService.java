@@ -1,13 +1,14 @@
 package com.delmoralcristian.notifier.application.service;
 
+import static com.delmoralcristian.notifier.enums.ENotificationStatus.COMPLETED;
+
 import com.delmoralcristian.notifier.application.port.in.DeliveryServiceUseCase;
 import com.delmoralcristian.notifier.application.port.out.ClientPersistencePort;
 import com.delmoralcristian.notifier.application.port.out.NotificationEventPersistencePort;
+import com.delmoralcristian.notifier.exceptions.EntityNotFoundException;
 import com.delmoralcristian.notifier.infrastructure.adapter.in.consumer.EventDTO;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.mapper.NotificationEventMapper;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.ClientEntity;
-import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.NotificationEventEntity;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,8 @@ public class DeliveryService implements DeliveryServiceUseCase {
         }
 
         var client = this.getClient(eventDTO.getClientId());
-        var event = this.notificationEventMapper.transformToNotificationEvent(client, eventDTO);
+        var event = this.notificationEventMapper.transformToNotificationEvent(
+            client.getId(), client.getWebhookUrl(), eventDTO);
 
         this.deliveryRetryHandler.attemptDelivery(event);
 
@@ -41,9 +43,16 @@ public class DeliveryService implements DeliveryServiceUseCase {
     }
 
     @Override
-    public void reSend(NotificationEventEntity event) {
+    public void reSend(String eventId) {
+        var event = notificationAdapter.findByEventId(eventId)
+            .orElseThrow(() -> new EntityNotFoundException("Notification event not found for eventId: " + eventId));
+
+        if (COMPLETED.name().equals(event.getDeliveryStatus())) {
+            throw new IllegalArgumentException("Event " + eventId + " is already COMPLETED and cannot be replayed");
+        }
+
         this.deliveryRetryHandler.attemptDelivery(event);
-        log.info("Event {} reprocessed with delivery status {}", event.getEventId(), event.getDeliveryStatus());
+        log.info("Event {} reprocessed with delivery status {}", eventId, event.getDeliveryStatus());
         this.notificationAdapter.save(event);
     }
 

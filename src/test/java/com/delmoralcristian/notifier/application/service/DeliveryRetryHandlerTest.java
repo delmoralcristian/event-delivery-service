@@ -8,7 +8,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.delmoralcristian.notifier.exceptions.WebhookDeliveryException;
-import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.ClientEntity;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.NotificationEventEntity;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -32,11 +31,10 @@ class DeliveryRetryHandlerTest {
     @Test
     void attemptDelivery_success_setsStatusCompleted() {
         var event = buildEvent();
-        var webhookUrl = event.getClient().getWebhookUrl();
 
         deliveryRetryHandler.attemptDelivery(event);
 
-        verify(restTemplate).postForEntity(eq(webhookUrl), eq(event.getContent()), eq(Void.class));
+        verify(restTemplate).postForEntity(eq(event.getWebhookUrl()), eq(event.getContent()), eq(Void.class));
         assertThat(event.getDeliveryStatus()).isEqualTo("COMPLETED");
     }
 
@@ -45,7 +43,7 @@ class DeliveryRetryHandlerTest {
         var event = buildEvent();
         doThrow(new RestClientException("connection refused"))
             .when(restTemplate).postForEntity(
-                eq(event.getClient().getWebhookUrl()),
+                eq(event.getWebhookUrl()),
                 eq(event.getContent()),
                 eq(Void.class));
 
@@ -56,8 +54,7 @@ class DeliveryRetryHandlerTest {
 
     @Test
     void attemptDelivery_emptyWebhookUrl_throwsWebhookDeliveryException() {
-        var client = ClientEntity.builder().id("CLIENT001").webhookUrl("").build();
-        var event = buildEventWithClient(client);
+        var event = buildEventWithWebhookUrl("");
 
         assertThatThrownBy(() -> deliveryRetryHandler.attemptDelivery(event))
             .isInstanceOf(WebhookDeliveryException.class)
@@ -75,21 +72,18 @@ class DeliveryRetryHandlerTest {
     }
 
     private NotificationEventEntity buildEvent() {
-        var client = ClientEntity.builder()
-            .id("CLIENT001")
-            .webhookUrl("https://webhook.example.com")
-            .build();
-        return buildEventWithClient(client);
+        return buildEventWithWebhookUrl("https://webhook.example.com");
     }
 
-    private NotificationEventEntity buildEventWithClient(ClientEntity client) {
+    private NotificationEventEntity buildEventWithWebhookUrl(String webhookUrl) {
         return NotificationEventEntity.builder()
             .eventId("EVT001")
             .eventType("credit_card_payment")
             .content("Payment of $150.00")
             .deliveryDate(LocalDateTime.now())
-            .deliveryStatus("COMPLETED")
-            .client(client)
+            .deliveryStatus("PENDING")
+            .clientId("CLIENT001")
+            .webhookUrl(webhookUrl)
             .build();
     }
 }

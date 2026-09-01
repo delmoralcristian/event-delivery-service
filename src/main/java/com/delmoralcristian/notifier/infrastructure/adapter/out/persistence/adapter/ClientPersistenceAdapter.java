@@ -13,9 +13,18 @@ public class ClientPersistenceAdapter implements ClientPersistencePort {
 
     private final JpaClientRepository repository;
 
-
     @Override
     public Optional<ClientEntity> findById(String id) {
         return this.repository.findById(id);
+    }
+
+    @Override
+    public boolean existsByIdAndApiKey(String clientId, String apiKey) {
+        return this.repository.existsByIdAndApiKey(clientId, apiKey);
+    }
+
+    @Override
+    public boolean existsByApiKey(String apiKey) {
+        return this.repository.existsByApiKey(apiKey);
     }
 }

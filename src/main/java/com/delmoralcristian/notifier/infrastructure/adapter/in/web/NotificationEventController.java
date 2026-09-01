@@ -40,13 +40,19 @@ public class NotificationEventController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<NotificationEventDTO> getByEventId(@PathVariable String id) {
-        return ResponseEntity.ok(this.notificationEventService.getByEventId(id));
+    public ResponseEntity<NotificationEventDTO> getByEventId(
+        @PathVariable String id,
+        @NotBlank(message = "clientId is required") @RequestParam String clientId) {
+
+        return ResponseEntity.ok(this.notificationEventService.getByEventId(id, clientId));
     }
 
     @PostMapping("/{id}/replay")
-    public ResponseEntity<Void> replay(@PathVariable String id) {
-        this.notificationEventService.replayNotification(id);
+    public ResponseEntity<Void> replay(
+        @PathVariable String id,
+        @NotBlank(message = "clientId is required") @RequestParam String clientId) {
+
+        this.notificationEventService.replayNotification(id, clientId);
         return ResponseEntity.accepted().build();
     }
 }

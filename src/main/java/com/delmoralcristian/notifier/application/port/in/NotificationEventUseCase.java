@@ -10,7 +10,7 @@ public interface NotificationEventUseCase {
     PagedResponse<NotificationEventDTO> findByFilters(String clientId, ENotificationStatus status,
         LocalDateTime from, LocalDateTime to, int page, int size);
 
-    NotificationEventDTO getByEventId(String eventId);
+    NotificationEventDTO getByEventId(String eventId, String clientId);
 
-    void replayNotification(String eventId);
+    void replayNotification(String eventId, String clientId);
 }

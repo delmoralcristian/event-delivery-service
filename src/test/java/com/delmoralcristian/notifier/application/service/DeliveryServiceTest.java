@@ -7,11 +7,11 @@ import static org.mockito.Mockito.when;
 
 import com.delmoralcristian.notifier.application.port.out.ClientPersistencePort;
 import com.delmoralcristian.notifier.application.port.out.NotificationEventPersistencePort;
+import com.delmoralcristian.notifier.exceptions.EntityNotFoundException;
 import com.delmoralcristian.notifier.infrastructure.adapter.in.consumer.EventDTO;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.mapper.NotificationEventMapper;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.ClientEntity;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity.NotificationEventEntity;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -37,15 +37,16 @@ class DeliveryServiceTest {
 
     private static final String EVENT_ID = "EVT001";
     private static final String CLIENT_ID = "CLIENT001";
+    private static final String WEBHOOK_URL = "https://webhook.example.com";
 
     @Test
     void send_newEvent_processesAndSaves() {
         var eventDTO = buildEventDTO();
         var client = buildClient();
-        var entity = buildEntity();
+        var entity = buildEntity("PENDING");
         when(notificationAdapter.existsByEventIdAndClientId(EVENT_ID, CLIENT_ID)).thenReturn(false);
         when(clientAdapter.findById(CLIENT_ID)).thenReturn(Optional.of(client));
-        when(notificationEventMapper.transformToNotificationEvent(client, eventDTO)).thenReturn(entity);
+        when(notificationEventMapper.transformToNotificationEvent(CLIENT_ID, WEBHOOK_URL, eventDTO)).thenReturn(entity);
 
         deliveryService.send(eventDTO);
 
@@ -77,12 +78,32 @@ class DeliveryServiceTest {
 
     @Test
     void reSend_attemptsDeliveryAndSaves() {
-        var entity = buildEntity();
+        var entity = buildEntity("FAILED");
+        when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
 
-        deliveryService.reSend(entity);
+        deliveryService.reSend(EVENT_ID);
 
         verify(deliveryRetryHandler).attemptDelivery(entity);
         verify(notificationAdapter).save(entity);
+    }
+
+    @Test
+    void reSend_alreadyCompleted_throwsIllegalArgument() {
+        var entity = buildEntity("COMPLETED");
+        when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> deliveryService.reSend(EVENT_ID))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("already COMPLETED");
+    }
+
+    @Test
+    void reSend_notFound_throwsEntityNotFoundException() {
+        when(notificationAdapter.findByEventId(EVENT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> deliveryService.reSend(EVENT_ID))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining(EVENT_ID);
     }
 
     private EventDTO buildEventDTO() {
@@ -98,19 +119,20 @@ class DeliveryServiceTest {
         return ClientEntity.builder()
             .id(CLIENT_ID)
             .name("Client A")
-            .webhookUrl("https://webhook.example.com")
+            .webhookUrl(WEBHOOK_URL)
             .active(true)
             .build();
     }
 
-    private NotificationEventEntity buildEntity() {
+    private NotificationEventEntity buildEntity(String status) {
         return NotificationEventEntity.builder()
             .eventId(EVENT_ID)
             .eventType("credit_card_payment")
             .content("Payment of $150.00")
             .deliveryDate(LocalDateTime.now())
-            .deliveryStatus("COMPLETED")
-            .client(buildClient())
+            .deliveryStatus(status)
+            .clientId(CLIENT_ID)
+            .webhookUrl(WEBHOOK_URL)
             .build();
     }
 

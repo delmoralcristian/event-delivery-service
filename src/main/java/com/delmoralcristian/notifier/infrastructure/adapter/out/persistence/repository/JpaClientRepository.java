@@ -7,4 +7,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface JpaClientRepository extends CrudRepository<ClientEntity, String> {
 
+    boolean existsByIdAndApiKey(String id, String apiKey);
+
+    boolean existsByApiKey(String apiKey);
 }

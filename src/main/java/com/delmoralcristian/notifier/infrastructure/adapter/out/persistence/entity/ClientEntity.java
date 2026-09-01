@@ -1,38 +1,35 @@
 package com.delmoralcristian.notifier.infrastructure.adapter.out.persistence.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "client")
+@Table("client")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ClientEntity implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class ClientEntity {
 
     @Id
+    @Column("id")
     private String id;
 
-    @Column
+    @Column("name")
     private String name;
 
-    @Column
+    @Column("webhook_url")
     private String webhookUrl;
 
-    @Column
+    @Column("active")
     private boolean active;
 
-
+    @Column("api_key")
+    private String apiKey;
 }

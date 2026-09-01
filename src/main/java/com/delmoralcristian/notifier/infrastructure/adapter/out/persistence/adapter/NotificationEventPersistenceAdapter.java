@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class NotificationEventPersistenceAdapter implements NotificationEventPer
     }
 
     @Override
+    @Transactional
     public NotificationEventEntity save(NotificationEventEntity notificationEventEntity) {
         return this.repository.save(notificationEventEntity);
     }

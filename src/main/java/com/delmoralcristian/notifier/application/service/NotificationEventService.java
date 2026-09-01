@@ -8,7 +8,7 @@ import com.delmoralcristian.notifier.application.port.out.ClientPersistencePort;
 import com.delmoralcristian.notifier.application.port.out.NotificationEventPersistencePort;
 import com.delmoralcristian.notifier.enums.ENotificationStatus;
 import com.delmoralcristian.notifier.infrastructure.adapter.out.mapper.NotificationEventMapper;
-import jakarta.persistence.EntityNotFoundException;
+import com.delmoralcristian.notifier.exceptions.EntityNotFoundException;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,8 +16,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
@@ -66,32 +66,33 @@ public class NotificationEventService implements NotificationEventUseCase {
     }
 
     @TrackProcessingTime
-    @Cacheable(value = "events", key = "#eventId")
+    @Cacheable(value = "events", key = "#eventId + ':' + #clientId")
     @Override
-    public NotificationEventDTO getByEventId(String eventId) {
-        log.info("Finding notification event by eventId: {}", eventId);
+    public NotificationEventDTO getByEventId(String eventId, String clientId) {
+        log.info("Finding notification event by eventId: {} for clientId: {}", eventId, clientId);
         var event = notificationAdapter.findByEventId(eventId)
+            .filter(e -> clientId.equals(e.getClientId()))
             .orElseThrow(() -> new EntityNotFoundException("Notification event not found for eventId: " + eventId));
         return notificationEventMapper.transformToDto(event);
     }
 
+    @Async
     @TrackProcessingTime
-    @Transactional
     @Caching(evict = {
         @CacheEvict(value = "events", key = "#eventId"),
         @CacheEvict(value = "event-pages", allEntries = true)
     })
     @Override
-    public void replayNotification(String eventId) {
-        log.info("Replaying notification event with eventId: {}", eventId);
+    public void replayNotification(String eventId, String clientId) {
+        log.info("Replaying notification event with eventId: {} for clientId: {}", eventId, clientId);
 
         var event = notificationAdapter.findByEventId(eventId)
             .orElseThrow(() -> new EntityNotFoundException("Notification event not found for eventId: " + eventId));
 
-        if ("COMPLETED".equals(event.getDeliveryStatus())) {
-            throw new IllegalArgumentException("Event " + eventId + " is already COMPLETED and cannot be replayed");
+        if (!clientId.equals(event.getClientId())) {
+            throw new EntityNotFoundException("Notification event not found for eventId: " + eventId);
         }
 
-        deliveryService.reSend(event);
+        deliveryService.reSend(eventId);
     }
 }
